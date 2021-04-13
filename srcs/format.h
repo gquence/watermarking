@@ -1,6 +1,7 @@
 #ifndef FORMAT_H
 #define FORMAT_H
 #include "common.h"
+#include "codec.h"
 
 extern "C"
 {
@@ -9,16 +10,17 @@ extern "C"
 #include <string>
 #include <iostream>
 #include <vector>
-#include <utility>
 
 /**
  * @brief Get the fctx from file
  * 
  * @param[in] filename name of input file
  * @param[out] fctx an instance that contains all info about media-file
+ * @param[out] opts options with information for (de)compressing media-file
+ * 
  * @return Zero on success, a negative value on error
  */
-int get_fctx_from_file(const std::string &filename, AVFormatContext **fctx);
+int get_fctx_from_file(const std::string &filename, AVFormatContext **fctx, AVDictionary **opts);
 
 /**
  * @brief Get information about
@@ -42,17 +44,35 @@ int get_all_streams(AVFormatContext *fctx, std::vector<AVStream*> &streamArr);
 int create_fctx(const std::string &filename, AVFormatContext **fctx);
 
 /**
- * @brief Create a corresponding streams object
+ * @brief Create a corresponding streams inside foramt context
  * 
  * @param[in] streamArr source array with streams and their codec params
  * @param[in/out] fctx dest format context(must be basicly initialized)
  * @return  Zero on success, a negative value on error
  */
-int create_corresponding_basic_streams(const std::vector<AVStream*> &streamArr, AVFormatContext *fctx);
+int create_corresponding_basic_streams(std::vector<t_codec_info> &codecArr, AVFormatContext *fctx);
+
+/**
+ * @brief Open a AVIOContext
+ * 
+ * @param[in/out] fctx dest format context
+ * @return int Zero on success, a negative value on openning error, One if fctx is not file
+ */
+int open_IOctx(AVFormatContext *fctx);
+
+/**
+ * @brief 
+ * 
+ * @param stream 
+ * @param codec 
+ * @param codec_ctx 
+ * @return int 
+ */
+int fill_streams_codec_info(AVStream *stream, AVCodec **codec, AVCodecContext **codec_ctx);
 
 /**
  * 
- * @param fctx 
+ * @param fctx format context which streams must to freed
  */
 void free_all_stream_from_fctx(AVFormatContext *fctx);
 
