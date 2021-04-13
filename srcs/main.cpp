@@ -202,51 +202,6 @@ ret_flag:
     return func_res;
 }
 
-int encode_video(t_codec_info *input_codecInfo, AVFrame *input_frame,
-                 AVStream *input_stream, AVStream *output_stream,
-                 AVFormatContext *output_ctx)
-{
-    if (input_frame) input_frame->pict_type = AV_PICTURE_TYPE_NONE;
-
-    AVPacket *output_packet = av_packet_alloc();
-    if (!output_packet)
-    {
-        if (DEBUG)
-        {
-            std::cout << "could not allocate memory for output packet";
-        }
-        return -1;
-    }
-
-    int response = avcodec_send_frame(input_codecInfo->CodecContext, input_frame);
-
-    while (response >= 0) {
-        response = avcodec_receive_packet(input_codecInfo->CodecContext, output_packet);
-        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
-            break;
-        } else if (response < 0) {
-            if (DEBUG){
-                std::cout << "Error while receiving packet from encoder: " << response;
-            }
-            return -1;
-        }
-
-        output_packet->stream_index = input_codecInfo->output_stream_index;
-        output_packet->duration = output_stream->time_base.den / output_stream->time_base.num / input_stream->avg_frame_rate.num * input_stream->avg_frame_rate.den;
-
-        av_packet_rescale_ts(output_packet, input_stream->time_base, output_stream->time_base);
-        response = av_write_frame(output_ctx, output_packet);
-        if (response != 0)
-        {
-            if (DEBUG)
-                std::cout << "Error %d while receiving packet from decoder: " << response;
-            return -1;
-        }
-    }
-    av_packet_unref(output_packet);
-    av_packet_free(&output_packet);
-    return 0;
-}
 
 
 static int decode_packet(AVPacket *pPacket, AVFrame *pFrame, t_codec_info *codecInfo)
