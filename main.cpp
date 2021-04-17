@@ -202,7 +202,9 @@ std::vector<t_stream_params> create_encode_stream_params(AVFormatContext *input_
     }
     if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) 
     {
-      av_opt_set(pLocalCodecContext->priv_data, "preset", "fast", 0);
+      av_opt_set(pLocalCodecContext->priv_data, "preset", "ultrafast", 0);
+      av_opt_set(pLocalCodecContext->priv_data, "tune", "zerolatency", 0);
+      av_opt_set(pLocalCodecContext->priv_data, "vprofile", "baseline", 0);
       
       pLocalCodecContext->height = decoder_ctx->height;
       pLocalCodecContext->width = decoder_ctx->width;
