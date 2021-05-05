@@ -15,8 +15,12 @@ LIB_FLAGS = -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lav
 SRC = $(addprefix $(SRC_DIR), $(SRCS))
 OBJ = $(addprefix $(OBJ_DIR), $(SRCS:.cpp=.o))
 
-all: 
-	g++ -Wall  -Wextra srcs/*.cpp  -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva
+all: all_get all_set
+
+all_set:
+	g++ -std=c++17 main.cpp  -g -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva -o set_mark.out
+all_get: 
+	g++ -std=c++17 find_watermark.cpp  -g -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva -o get_mark.out
 
 $(NAME): $(OBJ)
 	@echo "Linking..."
