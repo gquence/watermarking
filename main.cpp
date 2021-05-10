@@ -293,7 +293,7 @@ uint64_t frame_count;
 bool next_is_one = false;
 int main(int argc, const char *argv[])
 {
-  frame_count = 0;
+  frame_count = 1;
   if (argc < 2) {
     printf("You need to specify a media file.\n");
     return -1;
@@ -407,9 +407,11 @@ int main(int argc, const char *argv[])
 
   int response = 0;
   int how_many_packets_to_process = 8;
-  std::string message = "0";
+  std::string message = "101";
+  //std::string message = "01";
   int index = 0;
 
+  std::cout << video_stream_index;
   while (av_read_frame(pFormatContext, pPacket) >= 0)
   {
     if (pPacket->stream_index == video_stream_index) {
@@ -477,11 +479,17 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext,
         logging("Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB");
       }
       //save_gray_frame(pFrame->data[0], pFrame->linesize[0], pFrame->width, pFrame->height, frame_filename);
-
+      if (frame_count == 1)
+      {
+        if (message[0] == '1')
+          next_is_one = true;
+        else
+          next_is_one = false;
+      }
       if (frame_count % 10 == 0)
       {
         bool is_one;
-        std::cout << message[mess_index] << std::flush;
+        //std::cout << message[mess_index] << std::flush;
         if (message[mess_index] == '1')
         {
           is_one = true;
@@ -491,6 +499,7 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext,
           is_one = false;
         }
         set_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height, is_one);
+        std::cout << message[mess_index];
         mess_index++;
         if (message.length() <= mess_index)
         {
@@ -500,6 +509,10 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext,
           next_is_one = true;
         else
           next_is_one = false;
+      }
+      else if (frame_count % 10 == 9)
+      {
+        set_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height, next_is_one);
       }
       else{
         set_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height, !next_is_one);

@@ -47,10 +47,10 @@ static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, 
 static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned char *buf_cr, 
                             int wrap_y, int wrap_cb, int wrap_cr, int xsize, int ysize)
 {
-  int watermarksize = 150;
-  bool res_arr[watermarksize * watermarksize], *p_res_arr = (bool *)res_arr;
-  #if 1
-  uint32_t tmp_CB_index;
+  int           watermarksize = 150;
+  unsigned int  amount_of_marked_pixel = 0;
+  uint32_t      tmp_CB_index;
+  bool          res;
 
   for (unsigned int i = 0; i < watermarksize; i++)
   {
@@ -60,40 +60,19 @@ static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, u
         uint64_t arr_index = i * watermarksize + k;
         uint32_t CB_index =  tmp_CB_index + (j / 2);
 
-        res_arr[arr_index] = (*buf_y  & 0x3u) >= 0x2u ? true : false;
-        res_arr[arr_index] &= (*(buf_cb + CB_index) & 0x3u) >= 0x2u ? true : false;
-        res_arr[arr_index] &= (*(buf_cr + CB_index) & 0x3u) >= 0x2u ? true : false;
-
+        res = (*buf_y  & 0x3u) >= 0x2u ? true : false;
+        res &= (*(buf_cb + CB_index) & 0x3u) >= 0x2u ? true : false;
+        res &= (*(buf_cr + CB_index) & 0x3u) >= 0x2u ? true : false;
+        if (res == true)
+          amount_of_marked_pixel++;
 
         buf_y++;
     }
-  }   
-  #else
-    for (int i = 0; i < watermarksize; i++)
-    {
-        for (int j = (xsize - watermarksize); j < xsize; j++)
-        {
-            uint64_t Y_index = i * wrap_y + j;
-            uint64_t CB_index = (i/2) * wrap_cb +(j/2);
-
-            uint8_t y_values =  *(buf_y + Y_index)      | 0x3u;
-            uint8_t cb_values = *(buf_cb + CB_index)    | 0x3u;
-            uint8_t cr_values = *(buf_cr + CB_index)    | 0x3u;
-            *(buf_y + Y_index)  = y_values;
-            *(buf_cb + CB_index) = cb_values;
-            *(buf_cr + CB_index) = cr_values;
-        }
-    } 
-  #endif     
-
-  unsigned int amount_of_marked_pixel = 0;
-  for (unsigned int i = 0 ; i < watermarksize * watermarksize; i++)
-  {
-    if (res_arr[i] == true)
-        amount_of_marked_pixel++;
   }
   return amount_of_marked_pixel;
 }
+
+std::vector<unsigned int> frame_marks;
 
 int main(int argc, const char *argv[])
 {
@@ -244,6 +223,8 @@ int main(int argc, const char *argv[])
   int response = 0;
   int how_many_packets_to_process = 8;
 
+
+  frame_marks = std::vector<unsigned int>();
   while (av_read_frame(pFormatContext, pPacket) >= 0)
   {
     if (pPacket->stream_index == video_stream_index) {
@@ -302,24 +283,33 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
       }
 
       unsigned int ans = get_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height);
-      std::cout << ans << ", " ;
+      frame_marks.push_back(ans);
+      if (frame_marks.size() == 10)
+      {
+        unsigned int arr_size = frame_marks.size();
+        unsigned int blocks_sum = 0;
+        const unsigned int start_index = arr_size / 2;
+        for (unsigned int i = start_index; i < arr_size; i++)
+        {
+          if (i == arr_size - 1)
+          {
+            if ((blocks_sum / (arr_size - 2 - start_index)) > frame_marks[i])
+            {
+              std::cout << "0";
+            }
+            else
+              std::cout << "1";
+          }
+          else if (i == arr_size - 2)
+            continue;
+          else
+            blocks_sum += frame_marks[i];
+        }
+        frame_marks.clear();
+      }
+      //std::cout << ans << ", " ;
 
     }
   }
   return 0;
-}
-
-static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, char *filename)
-{
-    FILE *f;
-    int i;
-    f = fopen(filename,"w");
-    // writing the minimal required header for a pgm file format
-    // portable graymap format -> https://en.wikipedia.org/wiki/Netpbm_format#PGM_example
-    fprintf(f, "P5\n%d %d\n%d\n", xsize, ysize, 255);
-
-    // writing line by line
-    for (i = 0; i < ysize; i++)
-        fwrite(buf + i * wrap, 1, xsize, f);
-    fclose(f);
 }
