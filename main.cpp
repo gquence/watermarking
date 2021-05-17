@@ -26,7 +26,7 @@ extern "C"
 #include <iostream>
 #include <vector>
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct {
   AVCodec           *codec;
@@ -50,17 +50,17 @@ static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, 
 static void set_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned char *buf_cr, 
                             int wrap_y, int wrap_cb, int wrap_cr, int xsize, int ysize, bool is_one)
 {
-  int watermarksize = 200;
+  int watermarksize = 40;
   #if 1
   uint32_t tmp_CB_index;
   unsigned char mark;
 
   if (is_one == true)
-    mark = 0x3u;
+    mark = 0x7u;
   else
     mark = 0x0u;
 
-  for (unsigned int i = 0; i < watermarksize; i++)
+  for (unsigned int i = (ysize - watermarksize); i < ysize; i++)
   {
     tmp_CB_index = (i / 2) * wrap_cb;
     for (unsigned int j = (xsize - watermarksize); j < xsize; j++)
@@ -69,8 +69,8 @@ static void set_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned 
         unsigned char *p_cb = buf_cb + CB_index;
         unsigned char *p_cr = buf_cr + CB_index;
         *buf_y =  *buf_y  | mark;
-        *p_cb =   *p_cb   | mark;
-        *p_cr =   *p_cr   | mark;
+        //*p_cb =   *p_cb   | mark;
+        //*p_cr =   *p_cr   | mark;
         buf_y++;
     }
   }   
@@ -235,7 +235,7 @@ std::vector<t_stream_params> create_encode_stream_params(AVFormatContext *input_
       av_opt_set(pLocalCodecContext->priv_data, "preset", "slow", 0);
       av_opt_set(pLocalCodecContext->priv_data, "tune", "film", 0);
       av_opt_set(pLocalCodecContext->priv_data, "vprofile", "high", 0);  
-      av_opt_set(pLocalCodecContext->priv_data, "crf", "18", 0);
+      av_opt_set(pLocalCodecContext->priv_data, "crf", "23", 0);
       
       pLocalCodecContext->height = decoder_ctx->height;
       pLocalCodecContext->width = decoder_ctx->width;
@@ -293,7 +293,7 @@ uint64_t frame_count;
 bool next_is_one = false;
 int main(int argc, const char *argv[])
 {
-  frame_count = 1;
+  frame_count = 0;
   if (argc < 2) {
     printf("You need to specify a media file.\n");
     return -1;
@@ -407,11 +407,11 @@ int main(int argc, const char *argv[])
 
   int response = 0;
   int how_many_packets_to_process = 8;
-  std::string message = "101";
+  std::string message = "0110100001100101011011000110110001101111010111110111011101101111011100100110110001100100";
   //std::string message = "01";
   int index = 0;
 
-  std::cout << video_stream_index;
+  //std::cout << video_stream_index;
   while (av_read_frame(pFormatContext, pPacket) >= 0)
   {
     if (pPacket->stream_index == video_stream_index) {
@@ -441,12 +441,14 @@ int main(int argc, const char *argv[])
 
 static void logging(const char *fmt, ...)
 {
+  #if DEBUG == 1
     va_list args;
     fprintf( stderr, "LOG: " );
     va_start( args, fmt );
     vfprintf( stderr, fmt, args );
     va_end( args );
     fprintf( stderr, "\n" );
+  #endif
 }
 
 static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, 
@@ -454,13 +456,14 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext,
                          AVFormatContext *input_fctx, int stream_id,
                          const std::string message, int &mess_index)
 {
+  uint64_t first_skipped_frames = 10;
   int response = avcodec_send_packet(pCodecContext, pPacket);
 
   if (response < 0) {
     logging("Error while sending a packet to the decoder: %d", response);
     return response;
   }
-
+  
   while (response >= 0)
   {
     response = avcodec_receive_frame(pCodecContext, pFrame);
@@ -471,48 +474,38 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext,
       return response;
     }
 
+
     if (response >= 0) {
-      char frame_filename[1024];
-      snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", pCodecContext->frame_number);
+
       if (pFrame->format != AV_PIX_FMT_YUV420P)
       {
         logging("Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB");
       }
-      //save_gray_frame(pFrame->data[0], pFrame->linesize[0], pFrame->width, pFrame->height, frame_filename);
-      if (frame_count == 1)
+      uint64_t frame_key = 12;
+      uint64_t half_key = frame_key / 2;
+      uint64_t end_key = frame_key - 1;
+      uint64_t frame_module = frame_count % frame_key;
+
+      if (frame_count == first_skipped_frames)
       {
         if (message[0] == '1')
           next_is_one = true;
         else
           next_is_one = false;
       }
-      if (frame_count % 10 == 0)
+      if (frame_module >= half_key)
       {
         bool is_one;
-        //std::cout << message[mess_index] << std::flush;
-        if (message[mess_index] == '1')
-        {
-          is_one = true;
-        }
-        else
-        {
-          is_one = false;
-        }
+
+        if (message[mess_index] == '1') { is_one = true; }
+        else                            { is_one = false; }
+
         set_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height, is_one);
-        std::cout << message[mess_index];
-        mess_index++;
-        if (message.length() <= mess_index)
-        {
-          mess_index = 0;
-        }
-        if (message[mess_index] == '1')
-          next_is_one = true;
-        else
-          next_is_one = false;
-      }
-      else if (frame_count % 10 == 9)
-      {
-        set_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height, next_is_one);
+        
+        if (frame_module == end_key) { std::cout << message[mess_index]; mess_index++; }
+        if (message.length() <= mess_index) mess_index = 0;
+        if (message[mess_index] == '1') next_is_one = true;
+        else                            next_is_one = false;
       }
       else{
         set_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height, !next_is_one);

@@ -26,7 +26,7 @@ extern "C"
 #include <iostream>
 #include <vector>
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct {
   AVCodec           *codec;
@@ -47,12 +47,12 @@ static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, 
 static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned char *buf_cr, 
                             int wrap_y, int wrap_cb, int wrap_cr, int xsize, int ysize)
 {
-  int           watermarksize = 150;
+  int           watermarksize = 30;
   unsigned int  amount_of_marked_pixel = 0;
   uint32_t      tmp_CB_index;
   bool          res;
 
-  for (unsigned int i = 0; i < watermarksize; i++)
+  for (unsigned int i = (ysize - watermarksize); i < ysize; i++)
   {
     tmp_CB_index = (i / 2) * wrap_cb;
     for (unsigned int j = (xsize - watermarksize), k = 0; j < xsize && k < watermarksize; j++, k++)
@@ -60,9 +60,10 @@ static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, u
         uint64_t arr_index = i * watermarksize + k;
         uint32_t CB_index =  tmp_CB_index + (j / 2);
 
-        res = (*buf_y  & 0x3u) >= 0x2u ? true : false;
-        res &= (*(buf_cb + CB_index) & 0x3u) >= 0x2u ? true : false;
-        res &= (*(buf_cr + CB_index) & 0x3u) >= 0x2u ? true : false;
+        res = (*buf_y  & 0x7u) >= 0x4u ? true : false;
+        //res = (*buf_y  & 0x3u) >= 0x2u ? true : false;
+        //res &= (*(buf_cb + CB_index) & 0x3u) >= 0x2u ? true : false;
+        //res &= (*(buf_cr + CB_index) & 0x3u) >= 0x2u ? true : false;
         if (res == true)
           amount_of_marked_pixel++;
 
@@ -72,10 +73,12 @@ static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, u
   return amount_of_marked_pixel;
 }
 
+uint64_t frame_count;
 std::vector<unsigned int> frame_marks;
 
 int main(int argc, const char *argv[])
 {
+  frame_count = 0;
   if (argc < 2) {
     printf("You need to specify a media file.\n");
     return -1;
@@ -246,16 +249,19 @@ int main(int argc, const char *argv[])
 
 static void logging(const char *fmt, ...)
 {
+  #if DEBUG == 1
     va_list args;
     fprintf( stderr, "LOG: " );
     va_start( args, fmt );
     vfprintf( stderr, fmt, args );
     va_end( args );
     fprintf( stderr, "\n" );
+  #endif
 }
 
 static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame)
 {
+  uint64_t first_skipped_frames = 10;
   int response = avcodec_send_packet(pCodecContext, pPacket);
 
   if (response < 0) {
@@ -274,9 +280,14 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
     }
 
     if (response >= 0) {
-
-      char frame_filename[1024];
-      snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", pCodecContext->frame_number);
+      uint64_t frame_key = 12;
+      uint64_t half_key = frame_key / 2;
+      uint64_t key_0_1 = frame_key / 10 + ((frame_key % 10 >= 5) ? 1 : 0);
+      uint64_t first_period_start  = key_0_1;
+      uint64_t first_period_end    = half_key  - key_0_1;
+      uint64_t second_period_start = half_key  + key_0_1;
+      uint64_t second_period_end   = frame_key - key_0_1;
+      
       if (pFrame->format != AV_PIX_FMT_YUV420P)
       {
         logging("Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB");
@@ -284,27 +295,21 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 
       unsigned int ans = get_watermark(pFrame->data[0], pFrame->data[1], pFrame->data[2], pFrame->linesize[0], pFrame->linesize[1], pFrame->linesize[2], pFrame->width, pFrame->height);
       frame_marks.push_back(ans);
-      if (frame_marks.size() == 10)
+      if (frame_marks.size() == frame_key)
       {
-        unsigned int arr_size = frame_marks.size();
-        unsigned int blocks_sum = 0;
-        const unsigned int start_index = arr_size / 2;
-        for (unsigned int i = start_index; i < arr_size; i++)
-        {
-          if (i == arr_size - 1)
-          {
-            if ((blocks_sum / (arr_size - 2 - start_index)) > frame_marks[i])
-            {
-              std::cout << "0";
-            }
-            else
-              std::cout << "1";
-          }
-          else if (i == arr_size - 2)
-            continue;
-          else
-            blocks_sum += frame_marks[i];
-        }
+        unsigned int first_half_block_sum = 0, second_half_block_sum = 0;
+        uint64_t i = first_period_start;
+
+        for (; i < first_period_end; i++) { first_half_block_sum += frame_marks[i]; }
+        first_half_block_sum /= (half_key - key_0_1);
+
+        for (; i < second_period_start; i++) {}
+        for (; i < second_period_end; i++) { second_half_block_sum += frame_marks[i]; }
+        second_half_block_sum /= (half_key - key_0_1);
+
+        if (first_half_block_sum > second_half_block_sum) std::cout << "0";
+        else                                              std::cout << "1";
+
         frame_marks.clear();
       }
       //std::cout << ans << ", " ;
