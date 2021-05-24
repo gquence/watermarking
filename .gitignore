@@ -1,2 +1,10 @@
 a.out
 *.o
+get_mark.out
+set_mark.out
+*.log
+*.png
+*.xcf
+*.mp4
+.vscode
+*.p*m
