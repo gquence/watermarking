@@ -18,26 +18,13 @@ OBJ = $(addprefix $(OBJ_DIR), $(SRCS:.cpp=.o))
 all: all_get all_set
 
 all_set:
-	g++ -std=c++17 main.cpp  -g -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva -o set_mark.out
+	g++ -std=c++17 main.cpp  -O3 -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva -o set_mark.out
 all_get: 
-	g++ -std=c++17 find_watermark.cpp  -g -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva -o get_mark.out
+	g++ -std=c++17 find_watermark.cpp -O3 -pthread -lm -I /usr/local/include  -lavformat -lavcodec -lswscale -lavutil -lavfilter -lswresample -lavdevice -lz -lx264 -lva -o get_mark.out
 
-$(NAME): $(OBJ)
-	@echo "Linking..."
-	$(CC) $(COMMON_FLAGS)  $(COMMON_LIBS) $(OBJ) -o $@  $(LIB_FLAGS)
 
-$(OBJ): $(OBJ_DIR)%.o: $(SRC_DIR)%.cpp | $(OBJ_DIR)
-	$(CC) $(COMMON_FLAGS) -c $< -o $@ -I $(LIB_INC)
-
-$(OBJ_DIR):
-	@mkdir $(OBJ_DIR) 2< /dev/null || true
-	@echo "Compiling..."
-
-clean:
-	rm -rf $(OBJ) $(OBJ_DIR)
-	
 fclean: clean
-	rm -rf $(NAME)
+	rm -rf set_mark.out get_mark.out
 
 re: fclean all
 

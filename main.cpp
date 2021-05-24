@@ -50,15 +50,11 @@ static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, 
 static void set_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned char *buf_cr, 
                             int wrap_y, int wrap_cb, int wrap_cr, int xsize, int ysize, bool is_one)
 {
-  int watermarksize = 40;
+  int watermarksize = 100;
   #if 1
   uint32_t tmp_CB_index;
   unsigned char mark;
 
-  if (is_one == true)
-    mark = 0x7u;
-  else
-    mark = 0x0u;
 
   for (unsigned int i = (ysize - watermarksize); i < ysize; i++)
   {
@@ -68,7 +64,12 @@ static void set_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned 
         uint32_t CB_index =  tmp_CB_index + (j / 2);
         unsigned char *p_cb = buf_cb + CB_index;
         unsigned char *p_cr = buf_cr + CB_index;
-        *buf_y =  *buf_y  | mark;
+
+        if (is_one == true)
+          *p_cb =   *p_cb  | 0x3u;
+          //*buf_y =  *buf_y  | 0x3u;
+        else
+          *p_cb =   *p_cb  & 0xfcu;
         //*p_cb =   *p_cb   | mark;
         //*p_cr =   *p_cr   | mark;
         buf_y++;
@@ -235,7 +236,7 @@ std::vector<t_stream_params> create_encode_stream_params(AVFormatContext *input_
       av_opt_set(pLocalCodecContext->priv_data, "preset", "slow", 0);
       av_opt_set(pLocalCodecContext->priv_data, "tune", "film", 0);
       av_opt_set(pLocalCodecContext->priv_data, "vprofile", "high", 0);  
-      av_opt_set(pLocalCodecContext->priv_data, "crf", "23", 0);
+      av_opt_set(pLocalCodecContext->priv_data, "crf", "29", 0);
       
       pLocalCodecContext->height = decoder_ctx->height;
       pLocalCodecContext->width = decoder_ctx->width;
@@ -406,12 +407,9 @@ int main(int argc, const char *argv[])
   }
 
   int response = 0;
-  int how_many_packets_to_process = 8;
   std::string message = "0110100001100101011011000110110001101111010111110111011101101111011100100110110001100100";
-  //std::string message = "01";
   int index = 0;
 
-  //std::cout << video_stream_index;
   while (av_read_frame(pFormatContext, pPacket) >= 0)
   {
     if (pPacket->stream_index == video_stream_index) {
@@ -481,7 +479,7 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext,
       {
         logging("Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB");
       }
-      uint64_t frame_key = 12;
+      uint64_t frame_key = 14;
       uint64_t half_key = frame_key / 2;
       uint64_t end_key = frame_key - 1;
       uint64_t frame_module = frame_count % frame_key;

@@ -47,7 +47,7 @@ static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, 
 static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, unsigned char *buf_cr, 
                             int wrap_y, int wrap_cb, int wrap_cr, int xsize, int ysize)
 {
-  int           watermarksize = 30;
+  int           watermarksize = 75;
   unsigned int  amount_of_marked_pixel = 0;
   uint32_t      tmp_CB_index;
   bool          res;
@@ -60,9 +60,9 @@ static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, u
         uint64_t arr_index = i * watermarksize + k;
         uint32_t CB_index =  tmp_CB_index + (j / 2);
 
-        res = (*buf_y  & 0x7u) >= 0x4u ? true : false;
         //res = (*buf_y  & 0x3u) >= 0x2u ? true : false;
-        //res &= (*(buf_cb + CB_index) & 0x3u) >= 0x2u ? true : false;
+        //res = (*buf_y  & 0x3u) >= 0x2u ? true : false;
+        res = (*(buf_cb + CB_index) & 0x3u) >= 0x2u ? true : false;
         //res &= (*(buf_cr + CB_index) & 0x3u) >= 0x2u ? true : false;
         if (res == true)
           amount_of_marked_pixel++;
@@ -75,6 +75,7 @@ static unsigned int get_watermark(unsigned char *buf_y, unsigned char *buf_cb, u
 
 uint64_t frame_count;
 std::vector<unsigned int> frame_marks;
+std::string out_s;
 
 int main(int argc, const char *argv[])
 {
@@ -239,6 +240,7 @@ int main(int argc, const char *argv[])
   }
   std::cout << std::endl;
   logging("releasing all the resources");
+  std::cout << out_s;
 
   avformat_close_input(&pFormatContext);
   av_packet_free(&pPacket);
@@ -280,7 +282,7 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
     }
 
     if (response >= 0) {
-      uint64_t frame_key = 12;
+      uint64_t frame_key = 14;
       uint64_t half_key = frame_key / 2;
       uint64_t key_0_1 = frame_key / 10 + ((frame_key % 10 >= 5) ? 1 : 0);
       uint64_t first_period_start  = key_0_1;
@@ -312,7 +314,7 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 
         frame_marks.clear();
       }
-      //std::cout << ans << ", " ;
+      out_s.append(std::to_string(ans) + ", ");
 
     }
   }
