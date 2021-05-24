@@ -311,7 +311,7 @@ int main(int argc, const char *argv[])
 
   logging("opening the input file (%s) and loading format (container) header", argv[1]);
   if (avformat_open_input(&pFormatContext, argv[1], NULL, NULL) != 0) {
-    logging("ERROR could not open the file");
+    std::cerr << "ERROR could not open the file";
     return -1;
   }
 
@@ -319,7 +319,7 @@ int main(int argc, const char *argv[])
 
   logging("finding stream info from format");
   if (avformat_find_stream_info(pFormatContext,  NULL) < 0) {
-    logging("ERROR could not get the stream info");
+    std::cerr << "ERROR could not get the stream info";
     return -1;
   }
 
@@ -344,7 +344,7 @@ int main(int argc, const char *argv[])
     pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
 
     if (pLocalCodec==NULL) {
-      logging("ERROR unsupported codec!");
+      std::cerr << "ERROR unsupported codec!";
       continue;
     }
 
@@ -365,26 +365,26 @@ int main(int argc, const char *argv[])
   }
 
   if (video_stream_index == -1) {
-    logging("File %s does not contain a video stream!", argv[1]);
+    std::cerr << "File %s does not contain a video stream!", argv[1];
     return -1;
   }
 
   AVCodecContext *pCodecContext = avcodec_alloc_context3(pCodec);
   if (!pCodecContext)
   {
-    logging("failed to allocated memory for AVCodecContext");
+    std::cerr << "failed to allocated memory for AVCodecContext";
     return -1;
   }
 
   if (avcodec_parameters_to_context(pCodecContext, pCodecParameters) < 0)
   {
-    logging("failed to copy codec params to codec context");
+    std::cerr << "failed to copy codec params to codec context";
     return -1;
   }
 
   if (avcodec_open2(pCodecContext, pCodec, NULL) < 0)
   {
-    logging("failed to open codec through avcodec_open2");
+    std::cerr << "failed to open codec through avcodec_open2";
     return -1;
   }
 
@@ -396,13 +396,13 @@ int main(int argc, const char *argv[])
   AVFrame *pFrame = av_frame_alloc();
   if (!pFrame)
   {
-    logging("failed to allocated memory for AVFrame");
+    std::cerr << "failed to allocated memory for AVFrame";
     return -1;
   }
   AVPacket *pPacket = av_packet_alloc();
   if (!pPacket)
   {
-    logging("failed to allocated memory for AVPacket");
+    std::cerr << "failed to allocated memory for AVPacket";
     return -1;
   }
 
